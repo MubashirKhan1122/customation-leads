@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground: #f5f5f5;
+  --background: #0a0a0f;
+  --card: #111118;
+  --card-hover: #16161f;
+  --border: #1e1e2e;
+  --muted: #6b7280;
+  --accent: #6d28d9;
+  --accent-blue: #3b82f6;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+@layer utilities {
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400;
+  }
+  .card {
+    @apply bg-[var(--card)] border border-[var(--border)] rounded-xl;
+  }
+  .card-hover {
+    @apply hover:bg-[var(--card-hover)] hover:border-purple-500/30 transition-all duration-200;
+  }
+  .btn-primary {
+    @apply bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium px-6 py-2.5 rounded-lg transition-all duration-200 shadow-lg shadow-purple-500/20;
+  }
+  .btn-secondary {
+    @apply bg-[var(--card)] border border-[var(--border)] hover:border-purple-500/50 text-gray-300 font-medium px-6 py-2.5 rounded-lg transition-all duration-200;
+  }
+  .input-field {
+    @apply bg-[var(--card)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: #2e2e3e;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3e3e4e;
+}
+
+/* Score colors */
+.score-critical { color: #ef4444; }
+.score-warning { color: #f59e0b; }
+.score-good { color: #10b981; }
