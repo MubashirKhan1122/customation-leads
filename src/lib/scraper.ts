@@ -23,20 +23,8 @@ export async function scrapeEmails(url: string): Promise<string[]> {
 
   for (const pageUrl of pagesToCheck) {
     try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 8000)
-      const res = await fetch(pageUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml',
-        },
-        redirect: 'follow',
-      })
-      clearTimeout(timeout)
-
-      if (!res.ok) continue
-      const html = await res.text()
+      const html = await fetchWithProxies(pageUrl)
+      if (!html) continue
 
       const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g
       const found = html.match(emailRegex) || []
@@ -47,7 +35,7 @@ export async function scrapeEmails(url: string): Promise<string[]> {
           !lower.endsWith('.svg') && !lower.endsWith('.webp') && !lower.endsWith('.css') &&
           !lower.endsWith('.js') && !lower.includes('example.') && !lower.includes('wixpress') &&
           !lower.includes('sentry') && !lower.includes('cloudflare') && !lower.includes('webpack') &&
-          !lower.includes('schema.org') && !lower.includes('w3.org') &&
+          !lower.includes('schema.org') && !lower.includes('w3.org') && !lower.includes('googleapis') &&
           lower.length < 60
         ) {
           emails.add(lower)
@@ -78,6 +66,93 @@ export async function scrapeEmails(url: string): Promise<string[]> {
   return Array.from(emails)
 }
 
+// Fetch URL using free proxy services to bypass IP blocks
+async function fetchWithProxies(url: string, timeoutMs = 10000): Promise<string | null> {
+  // Try direct first
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      redirect: 'follow',
+    })
+    clearTimeout(timeout)
+    if (res.ok) return await res.text()
+  } catch {}
+
+  // Try proxies
+  const proxies = [
+    (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  ]
+
+  for (const proxyFn of proxies) {
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), timeoutMs)
+      const res = await fetch(proxyFn(url), {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      })
+      clearTimeout(timeout)
+      if (res.ok) {
+        const text = await res.text()
+        if (text.length > 100) return text
+      }
+    } catch {}
+  }
+
+  return null
+}
+
+// Fetch search engine HTML via proxy
+async function fetchSearchPage(url: string): Promise<string | null> {
+  const proxies = [
+    (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  ]
+
+  for (const proxyFn of proxies) {
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 12000)
+      const res = await fetch(proxyFn(url), {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      })
+      clearTimeout(timeout)
+      if (res.ok) {
+        const text = await res.text()
+        if (text.length > 500) return text
+      }
+    } catch {}
+  }
+
+  // Try direct as last resort
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    })
+    clearTimeout(timeout)
+    if (res.ok) return await res.text()
+  } catch {}
+
+  return null
+}
+
 interface BusinessResult {
   name: string
   website: string
@@ -86,96 +161,14 @@ interface BusinessResult {
   category: string
 }
 
-// Use Google Custom Search JSON API (100 free queries/day)
-async function searchGoogleCSE(query: string, apiKey: string, cseId: string): Promise<BusinessResult[]> {
-  const results: BusinessResult[] = []
-  const category = query.split(' ')[0] || 'business'
-
-  try {
-    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=10`
-    const res = await fetch(url)
-    const data = await res.json()
-
-    if (data.items && Array.isArray(data.items)) {
-      for (const item of data.items) {
-        const link = item.link || ''
-        if (!link.startsWith('http')) continue
-
-        let cleanUrl = link
-        try { cleanUrl = new URL(link).origin } catch {}
-
-        results.push({
-          name: (item.title || '').replace(/ - .*$/, '').replace(/ \| .*$/, '').trim(),
-          website: cleanUrl,
-          phone: '',
-          address: item.snippet || '',
-          category,
-        })
-      }
-    }
-  } catch (err) {
-    console.error('Google CSE error:', err)
-  }
-  return results
-}
-
-// Use SerpAPI for Google search (free tier: 100/month)
-async function searchSerpAPI(query: string, apiKey: string): Promise<BusinessResult[]> {
-  const results: BusinessResult[] = []
-  const category = query.split(' ')[0] || 'business'
-
-  try {
-    const url = `https://serpapi.com/search.json?q=${encodeURIComponent(query)}&api_key=${apiKey}&num=20`
-    const res = await fetch(url)
-    const data = await res.json()
-
-    // Local results (Google Maps businesses)
-    if (data.local_results?.places) {
-      for (const place of data.local_results.places) {
-        if (place.website) {
-          results.push({
-            name: place.title || place.name || '',
-            website: place.website,
-            phone: place.phone || '',
-            address: place.address || '',
-            category,
-          })
-        }
-      }
-    }
-
-    // Organic results
-    if (data.organic_results) {
-      for (const item of data.organic_results) {
-        const link = item.link || ''
-        if (!link.startsWith('http')) continue
-        if (isBlockedDomain(link)) continue
-
-        let cleanUrl = link
-        try { cleanUrl = new URL(link).origin } catch {}
-
-        results.push({
-          name: (item.title || '').replace(/ - .*$/, '').replace(/ \| .*$/, '').trim(),
-          website: cleanUrl,
-          phone: '',
-          address: item.snippet || '',
-          category,
-        })
-      }
-    }
-  } catch (err) {
-    console.error('SerpAPI error:', err)
-  }
-  return results
-}
-
 const BLOCKED_DOMAINS = [
   'google.com', 'bing.com', 'duckduckgo.com', 'yahoo.com',
   'facebook.com', 'instagram.com', 'twitter.com', 'x.com',
   'youtube.com', 'linkedin.com', 'pinterest.com', 'tiktok.com',
   'yelp.com', 'tripadvisor.com', 'wikipedia.org', 'amazon.com',
   'reddit.com', 'quora.com', 'medium.com', 'microsoft.com',
-  'apple.com', 'bbc.co.uk', 'bbc.com',
+  'apple.com', 'bbc.co.uk', 'bbc.com', 'allorigins.win',
+  'codetabs.com',
 ]
 
 function isBlockedDomain(url: string): boolean {
@@ -183,69 +176,138 @@ function isBlockedDomain(url: string): boolean {
   return BLOCKED_DOMAINS.some(d => lower.includes(d))
 }
 
-// Fallback: DuckDuckGo HTML
-async function searchDuckDuckGo(query: string): Promise<BusinessResult[]> {
+function cleanResult(title: string, link: string, category: string): BusinessResult | null {
+  if (!title || !link || !link.startsWith('http') || isBlockedDomain(link)) return null
+  let cleanUrl = link
+  try { cleanUrl = new URL(link).origin } catch { return null }
+  return {
+    name: title.replace(/ - .*$/, '').replace(/ \| .*$/, '').replace(/\s*\(.*\)\s*$/, '').trim().substring(0, 80),
+    website: cleanUrl,
+    phone: '',
+    address: '',
+    category,
+  }
+}
+
+// Google via proxy
+async function searchGoogle(query: string): Promise<BusinessResult[]> {
   const results: BusinessResult[] = []
   const category = query.split(' ')[0] || 'business'
-  try {
-    const res = await fetch('https://html.duckduckgo.com/html/', {
-      method: 'POST',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: `q=${encodeURIComponent(query + ' official site')}`,
-    })
-    const html = await res.text()
-    const $ = cheerio.load(html)
+  const url = `https://www.google.com/search?q=${encodeURIComponent(query + ' website')}&num=20&hl=en`
+  const html = await fetchSearchPage(url)
+  if (!html) return results
 
-    $('.result').each((_, el) => {
-      const titleEl = $(el).find('.result__a')
-      const title = titleEl.text().trim()
-      let link = titleEl.attr('href') || ''
-
-      if (link.includes('uddg=')) {
-        try {
-          const urlParam = new URL(link, 'https://duckduckgo.com').searchParams.get('uddg')
-          if (urlParam) link = urlParam
-        } catch {}
-      }
-
-      if (title && link && link.startsWith('http') && !isBlockedDomain(link)) {
-        let cleanUrl = link
-        try { cleanUrl = new URL(link).origin } catch {}
-        results.push({ name: title.replace(/ - .*$/, '').replace(/ \| .*$/, '').trim(), website: cleanUrl, phone: '', address: '', category })
-      }
-    })
-  } catch (err) {
-    console.error('DDG error:', err)
-  }
+  const $ = cheerio.load(html)
+  $('div.g').each((_, el) => {
+    const title = $(el).find('h3').first().text().trim()
+    const link = $(el).find('a').first().attr('href') || ''
+    const cleaned = cleanResult(title, link, category)
+    if (cleaned) results.push(cleaned)
+  })
   return results
 }
 
-// Fallback: Bing
+// DuckDuckGo via POST (works directly, no proxy needed)
+async function searchDuckDuckGo(query: string): Promise<BusinessResult[]> {
+  const results: BusinessResult[] = []
+  const category = query.split(' ')[0] || 'business'
+
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 12000)
+    const res = await fetch('https://html.duckduckgo.com/html/', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'text/html',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      body: `q=${encodeURIComponent(query + ' website')}`,
+    })
+    clearTimeout(timeout)
+    const html = await res.text()
+    const $ = cheerio.load(html)
+
+    // DDG uses class="result__a" with href containing uddg= redirect
+    $('a.result__a').each((_, el) => {
+      const title = $(el).text().trim()
+      let link = $(el).attr('href') || ''
+
+      // Decode the uddg redirect parameter
+      if (link.includes('uddg=')) {
+        try {
+          const match = link.match(/uddg=([^&]+)/)
+          if (match) link = decodeURIComponent(match[1])
+        } catch {}
+      }
+
+      const cleaned = cleanResult(title, link, category)
+      if (cleaned) results.push(cleaned)
+    })
+
+    // Also try via proxy if direct didn't work
+    if (results.length === 0) {
+      const proxyHtml = await fetchSearchPage(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query + ' website')}`)
+      if (proxyHtml) {
+        const $2 = cheerio.load(proxyHtml)
+        $2('a.result__a').each((_, el) => {
+          const title = $2(el).text().trim()
+          let link = $2(el).attr('href') || ''
+          if (link.includes('uddg=')) {
+            try {
+              const match = link.match(/uddg=([^&]+)/)
+              if (match) link = decodeURIComponent(match[1])
+            } catch {}
+          }
+          const cleaned = cleanResult(title, link, category)
+          if (cleaned) results.push(cleaned)
+        })
+      }
+    }
+  } catch (err) {
+    console.error('DDG search error:', err)
+  }
+
+  return results
+}
+
+// Bing via proxy
 async function searchBing(query: string): Promise<BusinessResult[]> {
   const results: BusinessResult[] = []
   const category = query.split(' ')[0] || 'business'
-  try {
-    const res = await fetch(`https://www.bing.com/search?q=${encodeURIComponent(query + ' website')}&count=20`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
-    })
-    const html = await res.text()
-    const $ = cheerio.load(html)
-    $('li.b_algo').each((_, el) => {
-      const titleEl = $(el).find('h2 a')
-      const title = titleEl.text().trim()
-      const link = titleEl.attr('href') || ''
-      if (title && link && link.startsWith('http') && !isBlockedDomain(link)) {
-        let cleanUrl = link
-        try { cleanUrl = new URL(link).origin } catch {}
-        results.push({ name: title.replace(/ - .*$/, '').replace(/ \| .*$/, '').trim(), website: cleanUrl, phone: '', address: '', category })
-      }
-    })
-  } catch (err) {
-    console.error('Bing error:', err)
-  }
+  const url = `https://www.bing.com/search?q=${encodeURIComponent(query + ' website')}&count=20`
+  const html = await fetchSearchPage(url)
+  if (!html) return results
+
+  const $ = cheerio.load(html)
+  $('li.b_algo').each((_, el) => {
+    const titleEl = $(el).find('h2 a')
+    const title = titleEl.text().trim()
+    const link = titleEl.attr('href') || ''
+    const cleaned = cleanResult(title, link, category)
+    if (cleaned) results.push(cleaned)
+  })
+  return results
+}
+
+// Yahoo via proxy
+async function searchYahoo(query: string): Promise<BusinessResult[]> {
+  const results: BusinessResult[] = []
+  const category = query.split(' ')[0] || 'business'
+  const url = `https://search.yahoo.com/search?p=${encodeURIComponent(query + ' website')}&n=20`
+  const html = await fetchSearchPage(url)
+  if (!html) return results
+
+  const $ = cheerio.load(html)
+  $('div.algo').each((_, el) => {
+    const titleEl = $(el).find('h3 a')
+    const title = titleEl.text().trim()
+    const link = titleEl.attr('href') || ''
+    const cleaned = cleanResult(title, link, category)
+    if (cleaned) results.push(cleaned)
+  })
   return results
 }
 
@@ -257,7 +319,7 @@ export async function searchBusinesses(
 ): Promise<BusinessResult[]> {
   const promises: Promise<BusinessResult[]>[] = []
 
-  // Use real APIs if configured
+  // Use paid APIs if configured
   if (serpApiKey) {
     promises.push(searchSerpAPI(query, serpApiKey))
   }
@@ -265,9 +327,11 @@ export async function searchBusinesses(
     promises.push(searchGoogleCSE(query, googleCseKey, googleCseId))
   }
 
-  // Always try free scraping as fallback
+  // Free: search all engines via proxy
+  promises.push(searchGoogle(query))
   promises.push(searchDuckDuckGo(query))
   promises.push(searchBing(query))
+  promises.push(searchYahoo(query))
 
   const settled = await Promise.allSettled(promises)
   const all: BusinessResult[] = []
@@ -287,4 +351,45 @@ export async function searchBusinesses(
   }
 
   return unique.slice(0, 20)
+}
+
+// Optional: SerpAPI (if user provides key)
+async function searchSerpAPI(query: string, apiKey: string): Promise<BusinessResult[]> {
+  const results: BusinessResult[] = []
+  const category = query.split(' ')[0] || 'business'
+  try {
+    const res = await fetch(`https://serpapi.com/search.json?q=${encodeURIComponent(query)}&api_key=${apiKey}&num=20`)
+    const data = await res.json()
+    if (data.local_results?.places) {
+      for (const place of data.local_results.places) {
+        if (place.website) {
+          results.push({ name: place.title || '', website: place.website, phone: place.phone || '', address: place.address || '', category })
+        }
+      }
+    }
+    if (data.organic_results) {
+      for (const item of data.organic_results) {
+        const cleaned = cleanResult(item.title || '', item.link || '', category)
+        if (cleaned) results.push(cleaned)
+      }
+    }
+  } catch {}
+  return results
+}
+
+// Optional: Google CSE (if user provides key)
+async function searchGoogleCSE(query: string, apiKey: string, cseId: string): Promise<BusinessResult[]> {
+  const results: BusinessResult[] = []
+  const category = query.split(' ')[0] || 'business'
+  try {
+    const res = await fetch(`https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=10`)
+    const data = await res.json()
+    if (data.items) {
+      for (const item of data.items) {
+        const cleaned = cleanResult(item.title || '', item.link || '', category)
+        if (cleaned) results.push(cleaned)
+      }
+    }
+  } catch {}
+  return results
 }
