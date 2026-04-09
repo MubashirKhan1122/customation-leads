@@ -3,13 +3,20 @@ import { scrapeEmails, searchBusinesses } from '@/lib/scraper'
 import { auditWebsite } from '@/lib/auditor'
 import { getServiceSupabase } from '@/lib/supabase'
 
+export const maxDuration = 60
+
 export async function POST(req: NextRequest) {
   const body = await req.json()
   const supabase = getServiceSupabase()
 
   if (body.action === 'search') {
-    const results = await searchBusinesses(body.query)
-    return NextResponse.json({ results })
+    try {
+      const results = await searchBusinesses(body.query)
+      return NextResponse.json({ results, count: results.length })
+    } catch (error: any) {
+      console.error('Search error:', error)
+      return NextResponse.json({ results: [], error: error.message })
+    }
   }
 
   if (body.action === 'process') {
@@ -20,7 +27,9 @@ export async function POST(req: NextRequest) {
       let emails: string[] = []
       try {
         emails = await scrapeEmails(business.website)
-      } catch { }
+      } catch (err) {
+        console.error('Email scrape error:', err)
+      }
 
       // Audit website
       let score: number | null = null
@@ -28,7 +37,9 @@ export async function POST(req: NextRequest) {
       try {
         auditResult = await auditWebsite(business.website)
         score = auditResult.score
-      } catch { }
+      } catch (err) {
+        console.error('Audit error:', err)
+      }
 
       // Save lead to database
       const { data: lead, error } = await supabase
@@ -46,6 +57,10 @@ export async function POST(req: NextRequest) {
         })
         .select()
         .single()
+
+      if (error) {
+        console.error('DB insert error:', error)
+      }
 
       // Save audit if available
       if (lead && auditResult) {
@@ -74,9 +89,9 @@ export async function POST(req: NextRequest) {
         saved: !!lead,
         lead_id: lead?.id,
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error('Process error:', error)
-      return NextResponse.json({ emails: [], score: null, saved: false })
+      return NextResponse.json({ emails: [], score: null, saved: false, error: error.message })
     }
   }
 

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auditWebsite } from '@/lib/auditor'
 import { getServiceSupabase } from '@/lib/supabase'
 
+export const maxDuration = 30
+
 export async function GET(req: NextRequest) {
   const leadId = req.nextUrl.searchParams.get('lead_id')
   if (!leadId) return NextResponse.json({ error: 'Missing lead_id' }, { status: 400 })
