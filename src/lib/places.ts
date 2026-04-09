@@ -56,6 +56,8 @@ async function findBusinessesOverpass(
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   ]
 
+  console.log(`[Overpass] Query: ${query.substring(0, 100)}...`)
+
   let data: any = null
   for (const server of servers) {
     try {
@@ -68,11 +70,14 @@ async function findBusinessesOverpass(
         body: `data=${encodeURIComponent(query)}`,
       })
       clearTimeout(timeout)
+      console.log(`[Overpass] ${server} → status ${res.status}`)
       if (res.ok) {
         data = await res.json()
+        console.log(`[Overpass] Got ${data?.elements?.length || 0} elements from ${server}`)
         if (data?.elements?.length > 0) break
       }
-    } catch {
+    } catch (err) {
+      console.error(`[Overpass] ${server} failed:`, err)
       continue
     }
   }
@@ -208,7 +213,9 @@ export async function findPlaces(query: string, userLat?: number, userLng?: numb
     }
   }
 
-  const places = await findBusinessesOverpass(lat, lng, category, 5000)
+  console.log(`[Places] Query: "${query}" → category="${category}" location="${locationQuery}" coords=${lat},${lng}`)
+
+  const places = await findBusinessesOverpass(lat, lng, category, 10000)
 
   // Sort: businesses with websites first
   places.sort((a, b) => {

@@ -11,8 +11,13 @@ export async function POST(req: NextRequest) {
 
   // Action: find — just find places (fast)
   if (body.action === 'find') {
-    const { places, location } = await findPlaces(body.query, body.lat, body.lng)
-    return NextResponse.json({ places, location })
+    try {
+      const { places, location } = await findPlaces(body.query, body.lat, body.lng)
+      return NextResponse.json({ places, location })
+    } catch (err: any) {
+      console.error('Find places error:', err)
+      return NextResponse.json({ places: [], location: null, error: err.message })
+    }
   }
 
   // Action: process — scrape emails + audit + save to DB
