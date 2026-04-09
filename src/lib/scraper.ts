@@ -93,23 +93,25 @@ interface BusinessResult {
 async function searchDuckDuckGo(query: string): Promise<BusinessResult[]> {
   const results: BusinessResult[] = []
   try {
-    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query + ' website')}`
-    const res = await fetch(searchUrl, {
+    // DuckDuckGo HTML requires POST request
+    const res = await fetch('https://html.duckduckgo.com/html/', {
+      method: 'POST',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
+      body: `q=${encodeURIComponent(query + ' website')}`,
       redirect: 'follow',
     })
     const html = await res.text()
     const $ = cheerio.load(html)
 
     $('.result').each((_, el) => {
-      const titleEl = $(el).find('.result__title a')
+      const titleEl = $(el).find('.result__a')
       const title = titleEl.text().trim()
       let link = titleEl.attr('href') || ''
-      const snippet = $(el).find('.result__snippet').text().trim()
 
       // DuckDuckGo HTML wraps links in a redirect
       if (link.includes('uddg=')) {
