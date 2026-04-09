@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Search, Users, FileBarChart, Mail, Settings, LogOut, Zap } from 'lucide-react'
+import { LayoutDashboard, Search, Users, FileBarChart, Mail, Settings, LogOut, Zap, Target } from 'lucide-react'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/prospect', label: 'Smart Prospector', icon: Target },
   { href: '/scrape', label: 'Find Leads', icon: Search },
   { href: '/leads', label: 'All Leads', icon: Users },
   { href: '/email', label: 'Email Center', icon: Mail },
