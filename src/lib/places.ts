@@ -44,24 +44,41 @@ async function findBusinessesOverpass(
   // Map common search terms to OSM tags
   const categoryTags = getCategoryTags(category)
 
-  const query = `
-    [out:json][timeout:25];
-    (
-      ${categoryTags.map(tag => `node${tag}(around:${radiusMeters},${lat},${lng});`).join('\n      ')}
-      ${categoryTags.map(tag => `way${tag}(around:${radiusMeters},${lat},${lng});`).join('\n      ')}
-    );
-    out body 50;
-  `
+  // Build compact query (no extra whitespace)
+  const nodeQueries = categoryTags.map(tag => `node${tag}(around:${radiusMeters},${lat},${lng});`).join('')
+  const wayQueries = categoryTags.map(tag => `way${tag}(around:${radiusMeters},${lat},${lng});`).join('')
+  const query = `[out:json][timeout:25];(${nodeQueries}${wayQueries});out body 50;`
+
+  // Try multiple Overpass servers
+  const servers = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  ]
+
+  let data: any = null
+  for (const server of servers) {
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 15000)
+      const res = await fetch(server, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(query)}`,
+      })
+      clearTimeout(timeout)
+      if (res.ok) {
+        data = await res.json()
+        if (data?.elements?.length > 0) break
+      }
+    } catch {
+      continue
+    }
+  }
 
   try {
-    const res = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `data=${encodeURIComponent(query)}`,
-    })
-    const data = await res.json()
-
-    if (data.elements) {
+    if (data?.elements) {
       for (const el of data.elements) {
         const tags = el.tags || {}
         const name = tags.name || tags['name:en'] || ''
