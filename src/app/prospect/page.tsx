@@ -20,17 +20,6 @@ interface ProspectResult {
   saved: boolean
 }
 
-const CITIES = [
-  { name: 'Karachi', lat: 24.8607, lng: 67.0011 },
-  { name: 'Lahore', lat: 31.5204, lng: 74.3587 },
-  { name: 'Islamabad', lat: 33.6844, lng: 73.0479 },
-  { name: 'Rawalpindi', lat: 33.5651, lng: 73.0169 },
-  { name: 'Faisalabad', lat: 31.4504, lng: 73.1350 },
-  { name: 'Multan', lat: 30.1575, lng: 71.5249 },
-  { name: 'Peshawar', lat: 34.0151, lng: 71.5249 },
-  { name: 'Quetta', lat: 30.1798, lng: 66.9750 },
-]
-
 const CATEGORIES = [
   { label: 'Restaurants & Cafes', value: 'restaurants' },
   { label: 'Salons & Beauty', value: 'salons' },
@@ -44,7 +33,10 @@ const CATEGORIES = [
 ]
 
 export default function ProspectPage() {
-  const [selectedCities, setSelectedCities] = useState<string[]>(['Karachi', 'Lahore', 'Islamabad'])
+  const [cities, setCities] = useState<Array<{name: string; lat: number; lng: number}>>([])
+  const [cityInput, setCityInput] = useState('')
+  const [citySearching, setCitySearching] = useState(false)
+  const [citySuggestions, setCitySuggestions] = useState<Array<{name: string; lat: number; lng: number}>>([])
   const [selectedCategory, setSelectedCategory] = useState('restaurants')
   const [results, setResults] = useState<ProspectResult[]>([])
   const [scanning, setScanning] = useState(false)
@@ -60,14 +52,37 @@ export default function ProspectPage() {
     processed: results.filter(r => r.processed).length,
   }
 
-  const toggleCity = (city: string) => {
-    setSelectedCities(prev =>
-      prev.includes(city) ? prev.filter(c => c !== city) : [...prev, city]
-    )
+  const searchCity = async () => {
+    if (!cityInput.trim()) return
+    setCitySearching(true)
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityInput)}&format=json&limit=5&addressdetails=1`, {
+        headers: { 'User-Agent': 'CustomationLeadMachine/1.0' }
+      })
+      const data = await res.json()
+      setCitySuggestions(data.map((d: any) => ({
+        name: d.display_name.split(',').slice(0, 2).join(',').trim(),
+        lat: parseFloat(d.lat),
+        lng: parseFloat(d.lon),
+      })))
+    } catch {}
+    setCitySearching(false)
+  }
+
+  const addCity = (city: {name: string; lat: number; lng: number}) => {
+    if (!cities.find(c => c.name === city.name)) {
+      setCities(prev => [...prev, city])
+    }
+    setCitySuggestions([])
+    setCityInput('')
+  }
+
+  const removeCity = (name: string) => {
+    setCities(prev => prev.filter(c => c.name !== name))
   }
 
   const startScan = async () => {
-    if (selectedCities.length === 0) return
+    if (cities.length === 0) return
     setScanning(true)
     setResults([])
     setProgress('Starting smart scan...')
@@ -75,11 +90,8 @@ export default function ProspectPage() {
     const allPlaces: ProspectResult[] = []
 
     // Step 1: Find businesses across all selected cities
-    for (const cityName of selectedCities) {
-      const city = CITIES.find(c => c.name === cityName)
-      if (!city) continue
-
-      setProgress(`Searching ${selectedCategory} in ${cityName}...`)
+    for (const city of cities) {
+      setProgress(`Searching ${selectedCategory} in ${city.name}...`)
 
       try {
         const res = await fetch('/api/places', {
@@ -87,7 +99,7 @@ export default function ProspectPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'find',
-            query: `${selectedCategory} ${cityName}`,
+            query: `${selectedCategory} ${city.name}`,
             lat: city.lat,
             lng: city.lng,
           }),
@@ -100,7 +112,7 @@ export default function ProspectPage() {
             website: p.website || '',
             phone: p.phone || '',
             address: p.address || '',
-            city: cityName,
+            city: city.name,
             category: selectedCategory,
             emails: [],
             score: null,
@@ -122,7 +134,7 @@ export default function ProspectPage() {
     }
 
     setResults(allPlaces)
-    setProgress(`Found ${allPlaces.length} businesses across ${selectedCities.length} cities. Now analyzing who needs services...`)
+    setProgress(`Found ${allPlaces.length} businesses across ${cities.length} cities. Now analyzing who needs services...`)
 
     // Step 2: Process each business — scrape emails, audit, detect needs
     for (let i = 0; i < allPlaces.length; i++) {
@@ -188,7 +200,7 @@ export default function ProspectPage() {
           <Target className="w-8 h-8 text-purple-400" />
           Smart Prospector
         </h1>
-        <p className="text-gray-500 mt-1">Auto-find businesses in Pakistan that need your services</p>
+        <p className="text-gray-500 mt-1">Auto-find businesses worldwide that need your services</p>
       </div>
 
       {/* Config Panel */}
@@ -196,18 +208,59 @@ export default function ProspectPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Cities */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">Select Cities</label>
-            <div className="flex flex-wrap gap-2">
-              {CITIES.map(city => (
-                <button key={city.name} onClick={() => toggleCity(city.name)}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
-                    selectedCities.includes(city.name)
-                      ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30'
-                      : 'bg-white/5 text-gray-400 border border-transparent hover:border-gray-600'
-                  }`}>
-                  <MapPin className="w-3 h-3 inline mr-1" />{city.name}
+            <label className="block text-sm font-medium text-gray-300 mb-3">Search & Add Cities (Worldwide)</label>
+            <div className="flex gap-2 mb-3">
+              <input type="text" value={cityInput} onChange={e => setCityInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && searchCity()}
+                placeholder="Type any city: London, Dubai, New York..."
+                className="input-field flex-1 text-sm py-2" />
+              <button onClick={searchCity} disabled={citySearching}
+                className="btn-secondary text-sm px-4 disabled:opacity-50">
+                {citySearching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+              </button>
+            </div>
+            {/* Suggestions */}
+            {citySuggestions.length > 0 && (
+              <div className="mb-3 space-y-1">
+                {citySuggestions.map((s, i) => (
+                  <button key={i} onClick={() => addCity(s)}
+                    className="w-full text-left text-sm px-3 py-2 rounded-lg bg-white/5 hover:bg-purple-500/10 text-gray-300 hover:text-purple-400 transition-all truncate">
+                    <MapPin className="w-3 h-3 inline mr-2" />{s.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* Quick add popular cities */}
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {[
+                {name:'London', lat:51.5074, lng:-0.1278},
+                {name:'Dubai', lat:25.2048, lng:55.2708},
+                {name:'New York', lat:40.7128, lng:-74.0060},
+                {name:'Karachi', lat:24.8607, lng:67.0011},
+                {name:'Lahore', lat:31.5204, lng:74.3587},
+                {name:'Istanbul', lat:41.0082, lng:28.9784},
+                {name:'Sydney', lat:-33.8688, lng:151.2093},
+                {name:'Toronto', lat:43.6532, lng:-79.3832},
+                {name:'Mumbai', lat:19.0760, lng:72.8777},
+                {name:'Berlin', lat:52.5200, lng:13.4050},
+                {name:'Paris', lat:48.8566, lng:2.3522},
+                {name:'Singapore', lat:1.3521, lng:103.8198},
+              ].map(city => (
+                <button key={city.name} onClick={() => addCity(city)}
+                  className="text-[10px] px-2 py-1 rounded bg-white/5 text-gray-500 hover:text-purple-400 hover:bg-purple-500/10 transition-all">
+                  {city.name}
                 </button>
               ))}
+            </div>
+            {/* Selected cities */}
+            <div className="flex flex-wrap gap-2">
+              {cities.map(city => (
+                <span key={city.name} className="px-3 py-1.5 rounded-lg text-sm bg-purple-600/20 text-purple-400 border border-purple-500/30 flex items-center gap-2">
+                  <MapPin className="w-3 h-3" />{city.name}
+                  <button onClick={() => removeCity(city.name)} className="hover:text-red-400">&times;</button>
+                </span>
+              ))}
+              {cities.length === 0 && <span className="text-xs text-gray-600">No cities selected — search or click quick-add above</span>}
             </div>
           </div>
 
@@ -231,9 +284,9 @@ export default function ProspectPage() {
 
         <div className="mt-6 flex items-center justify-between">
           <p className="text-xs text-gray-500">
-            Will scan {selectedCities.length} cities for {CATEGORIES.find(c => c.value === selectedCategory)?.label || selectedCategory}
+            Will scan {cities.length} cities for {CATEGORIES.find(c => c.value === selectedCategory)?.label || selectedCategory}
           </p>
-          <button onClick={startScan} disabled={scanning || selectedCities.length === 0}
+          <button onClick={startScan} disabled={scanning || cities.length === 0}
             className="btn-primary flex items-center gap-2 disabled:opacity-50">
             {scanning ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Scanning...</>
@@ -446,7 +499,7 @@ export default function ProspectPage() {
             exactly what services to pitch each one.
           </p>
           <div className="text-xs text-gray-600 space-y-1">
-            <p>🔍 Finds businesses across multiple Pakistani cities</p>
+            <p>🔍 Finds businesses across cities worldwide</p>
             <p>🌐 Checks who has a website and who doesn&apos;t</p>
             <p>📊 Audits each website for speed, SEO, mobile, SSL</p>
             <p>🎯 Tells you exactly what service each business needs</p>

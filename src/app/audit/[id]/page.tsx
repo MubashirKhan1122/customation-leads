@@ -18,6 +18,9 @@ export default function AuditPage() {
   const [newNote, setNewNote] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [newTag, setNewTag] = useState('')
+  const [compareUrl, setCompareUrl] = useState('')
+  const [comparing, setComparing] = useState(false)
+  const [competitor, setCompetitor] = useState<any>(null)
 
   useEffect(() => {
     fetch(`/api/audit?lead_id=${params.id}`)
@@ -70,6 +73,23 @@ export default function AuditPage() {
       body: JSON.stringify({ lead_id: lead.id, tags: updated }),
     })
     setTags(updated)
+  }
+
+  const runCompare = async () => {
+    if (!compareUrl.trim() || !lead) return
+    setComparing(true)
+    let url = compareUrl.trim()
+    if (!url.startsWith('http')) url = 'https://' + url
+    try {
+      const res = await fetch('/api/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url1: lead.website, url2: url }),
+      })
+      const data = await res.json()
+      setCompetitor(data.site2)
+    } catch {}
+    setComparing(false)
   }
 
   const runAudit = async () => {
@@ -265,6 +285,50 @@ export default function AuditPage() {
               {notes.length === 0 && <p className="text-xs text-gray-600">No notes yet</p>}
             </div>
           </div>
+        </div>
+      )}
+      {/* Competitor Comparison */}
+      {lead && audit && (
+        <div className="card p-6 mt-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Compare with Competitor</h2>
+          <div className="flex gap-3 mb-4">
+            <input type="text" value={compareUrl} onChange={e => setCompareUrl(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && runCompare()}
+              placeholder="Enter competitor website URL..."
+              className="input-field flex-1 text-sm" />
+            <button onClick={runCompare} disabled={comparing}
+              className="btn-primary text-sm disabled:opacity-50">
+              {comparing ? 'Comparing...' : 'Compare'}
+            </button>
+          </div>
+
+          {competitor?.audit && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-4 rounded-lg bg-white/[0.02] border border-[var(--border)]">
+                <p className="text-xs text-gray-500 mb-2 truncate">{lead.website.replace(/https?:\/\//, '')}</p>
+                <div className={`text-4xl font-bold ${audit.score >= 60 ? 'text-green-400' : audit.score >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {audit.score}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Your Client</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-white/[0.02] border border-[var(--border)]">
+                <p className="text-xs text-gray-500 mb-2 truncate">{compareUrl.replace(/https?:\/\//, '')}</p>
+                <div className={`text-4xl font-bold ${competitor.audit.score >= 60 ? 'text-green-400' : competitor.audit.score >= 40 ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {competitor.audit.score}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Competitor</p>
+              </div>
+            </div>
+          )}
+
+          {competitor?.audit && audit.score < competitor.audit.score && (
+            <div className="mt-4 p-4 rounded-lg bg-red-500/5 border border-red-500/20">
+              <p className="text-sm text-red-400">
+                Their competitor scores <strong>{competitor.audit.score - audit.score} points higher</strong>.
+                This is a strong pitch angle — show them exactly what their competition does better.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </DashboardLayout>

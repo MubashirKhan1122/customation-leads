@@ -30,13 +30,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Gmail not configured. Go to Settings to set up.' })
     }
 
-    const { subject, html } = generateEmailTemplate(
+    const { subject, html: rawHtml } = generateEmailTemplate(
       body.lead_name,
       body.issues || [],
       body.score || 0,
       senderName,
       companyName,
     )
+
+    // Insert email log first with 'pending' status to get the ID
+    const { data: emailLog } = await supabase.from('email_logs').insert({
+      lead_id: body.lead_id,
+      subject,
+      body: rawHtml,
+      status: 'pending',
+    }).select('id').single()
+
+    // Replace tracking pixel placeholder with actual tracking pixel
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://customation-leads.vercel.app'
+    const html = emailLog
+      ? rawHtml.replace('{{tracking_pixel}}', `<img src="${appUrl}/api/track?id=${emailLog.id}&a=open" width="1" height="1" style="display:none" />`)
+      : rawHtml.replace('{{tracking_pixel}}', '')
 
     try {
       await sendEmail({
@@ -48,24 +62,16 @@ export async function POST(req: NextRequest) {
         from: `"${companyName}" <${gmailUser}>`,
       })
 
-      // Log email
-      await supabase.from('email_logs').insert({
-        lead_id: body.lead_id,
-        subject,
-        body: html,
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-      })
+      // Update email log to sent
+      if (emailLog) {
+        await supabase.from('email_logs').update({
+          status: 'sent',
+          body: html,
+          sent_at: new Date().toISOString(),
+        }).eq('id', emailLog.id)
+      }
 
       // Schedule follow-up sequence
-      const { data: emailLog } = await supabase
-        .from('email_logs')
-        .select('id')
-        .eq('lead_id', body.lead_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
       if (emailLog) {
         await scheduleFollowUps(body.lead_id, emailLog.id)
       }
@@ -78,13 +84,19 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({ success: true })
     } catch (error: any) {
-      // Log failed email
-      await supabase.from('email_logs').insert({
-        lead_id: body.lead_id,
-        subject,
-        body: html,
-        status: 'failed',
-      })
+      // Update email log to failed
+      if (emailLog) {
+        await supabase.from('email_logs').update({
+          status: 'failed',
+        }).eq('id', emailLog.id)
+      } else {
+        await supabase.from('email_logs').insert({
+          lead_id: body.lead_id,
+          subject,
+          body: html,
+          status: 'failed',
+        })
+      }
 
       return NextResponse.json({ success: false, error: error.message })
     }

@@ -20,6 +20,19 @@ export async function GET() {
   const avg_score = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0
   const hot_leads = leads.filter(l => l.score !== null && l.score < 60).length
 
+  // Email activity stats
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+  const weekStart = new Date(now.getTime() - 7 * 86400000).toISOString()
+
+  const emails_today = emails.filter(e => e.status === 'sent' && e.sent_at && e.sent_at >= todayStart).length
+  const emails_week = emails.filter(e => e.status === 'sent' && e.sent_at && e.sent_at >= weekStart).length
+
+  // Follow-up stats
+  const { data: followUps } = await supabase.from('follow_up_sequences').select('status')
+  const followups_pending = (followUps || []).filter(f => f.status === 'pending').length
+  const followups_sent = (followUps || []).filter(f => f.status === 'sent').length
+
   return NextResponse.json({
     total_leads,
     leads_with_email,
@@ -27,6 +40,10 @@ export async function GET() {
     emails_replied,
     avg_score,
     hot_leads,
+    emails_today,
+    emails_week,
+    followups_pending,
+    followups_sent,
     recent_leads: leads.slice(0, 10),
   })
 }

@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Search, Users, FileBarChart, Mail, Settings, LogOut, Zap, Target } from 'lucide-react'
+import { LayoutDashboard, Search, Users, Mail, Settings, LogOut, Zap, Target, Menu, X, FolderOpen } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -10,14 +11,21 @@ const navItems = [
   { href: '/scrape', label: 'Find Leads', icon: Search },
   { href: '/leads', label: 'All Leads', icon: Users },
   { href: '/email', label: 'Email Center', icon: Mail },
+  { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onToggle }: { isOpen?: boolean; onToggle?: () => void }) {
   const pathname = usePathname()
+  const [mobileOpen, setMobileOpen] = useState(false)
 
-  return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-[#0d0d14] border-r border-[var(--border)] flex flex-col z-50">
+  // Close on route change
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
+
+  const sidebarContent = (
+    <>
       <div className="p-6 border-b border-[var(--border)]">
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
@@ -59,6 +67,35 @@ export default function Sidebar() {
           Logout
         </Link>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setMobileOpen(!mobileOpen)}
+        className="fixed top-4 left-4 z-[60] lg:hidden w-10 h-10 rounded-lg bg-[#111118] border border-[var(--border)] flex items-center justify-center text-gray-400 hover:text-white"
+      >
+        {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+      </button>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[49] lg:hidden" onClick={() => setMobileOpen(false)} />
+      )}
+
+      {/* Mobile sidebar */}
+      <aside className={`fixed left-0 top-0 h-screen w-64 bg-[#0d0d14] border-r border-[var(--border)] flex flex-col z-50 lg:hidden transition-transform duration-300 ${
+        mobileOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        {sidebarContent}
+      </aside>
+
+      {/* Desktop sidebar */}
+      <aside className="fixed left-0 top-0 h-screen w-64 bg-[#0d0d14] border-r border-[var(--border)] flex-col z-50 hidden lg:flex">
+        {sidebarContent}
+      </aside>
+    </>
   )
 }

@@ -12,6 +12,10 @@ interface Stats {
   emails_replied: number
   avg_score: number
   hot_leads: number
+  emails_today: number
+  emails_week: number
+  followups_pending: number
+  followups_sent: number
   recent_leads: Array<{
     id: string
     name: string
@@ -63,6 +67,29 @@ export default function DashboardPage() {
         <StatCard label="Replies" value={stats?.emails_replied || 0} icon={CheckCircle} color="green" />
         <StatCard label="Reply Rate" value={`${replyRate}%`} icon={TrendingUp} color="yellow" />
         <StatCard label="Hot Leads" value={stats?.hot_leads || 0} icon={AlertTriangle} color="red" trend="Score < 60" />
+      </div>
+
+      {/* Email Activity */}
+      <div className="card p-6 mb-8">
+        <h2 className="text-lg font-semibold text-white mb-4">Email Activity</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white/[0.02] rounded-lg p-4 text-center">
+            <div className="text-2xl font-bold text-purple-400">{stats?.emails_today ?? 0}</div>
+            <div className="text-xs text-gray-500 mt-1">Sent Today</div>
+          </div>
+          <div className="bg-white/[0.02] rounded-lg p-4 text-center">
+            <div className="text-2xl font-bold text-blue-400">{stats?.emails_week ?? 0}</div>
+            <div className="text-xs text-gray-500 mt-1">This Week</div>
+          </div>
+          <div className="bg-white/[0.02] rounded-lg p-4 text-center">
+            <div className="text-2xl font-bold text-yellow-400">{stats?.followups_pending ?? 0}</div>
+            <div className="text-xs text-gray-500 mt-1">Follow-ups Pending</div>
+          </div>
+          <div className="bg-white/[0.02] rounded-lg p-4 text-center">
+            <div className="text-2xl font-bold text-green-400">{stats?.followups_sent ?? 0}</div>
+            <div className="text-xs text-gray-500 mt-1">Follow-ups Sent</div>
+          </div>
+        </div>
       </div>
 
       {/* Recent Leads Table */}

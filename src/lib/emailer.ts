@@ -47,6 +47,7 @@ export function generateEmailTemplate(
       <strong>${senderName}</strong><br/>
       ${companyName}<br/>
       <span style="color:#6b7280;font-size:13px;">Design & Tech Agency</span></p>
+      {{tracking_pixel}}
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 16px;" />
       <p style="color:#9ca3af;font-size:11px;text-align:center;">
         You're receiving this because we found your business online.<br/>
