@@ -9,21 +9,30 @@ export const maxDuration = 60
 export async function GET() {
   const supabase = getServiceSupabase()
 
-  const { data: pending } = await supabase
-    .from('follow_up_sequences')
-    .select('*, leads(name, email, website, score)')
-    .eq('status', 'pending')
-    .order('scheduled_at', { ascending: true })
-    .limit(50)
+  let pending: any[] = []
+  let sent: any[] = []
 
-  const { data: sent } = await supabase
-    .from('follow_up_sequences')
-    .select('*, leads(name, email)')
-    .eq('status', 'sent')
-    .order('sent_at', { ascending: false })
-    .limit(20)
+  try {
+    const { data: p } = await supabase
+      .from('follow_up_sequences')
+      .select('*, leads(name, email, website, score)')
+      .eq('status', 'pending')
+      .order('scheduled_at', { ascending: true })
+      .limit(50)
+    pending = p || []
+  } catch {}
 
-  return NextResponse.json({ pending: pending || [], sent: sent || [] })
+  try {
+    const { data: s } = await supabase
+      .from('follow_up_sequences')
+      .select('*, leads(name, email)')
+      .eq('status', 'sent')
+      .order('sent_at', { ascending: false })
+      .limit(20)
+    sent = s || []
+  } catch {}
+
+  return NextResponse.json({ pending, sent })
 }
 
 // POST: Process due follow-ups (call this via cron or manually)

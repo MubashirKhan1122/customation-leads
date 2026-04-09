@@ -28,10 +28,14 @@ export async function GET() {
   const emails_today = emails.filter(e => e.status === 'sent' && e.sent_at && e.sent_at >= todayStart).length
   const emails_week = emails.filter(e => e.status === 'sent' && e.sent_at && e.sent_at >= weekStart).length
 
-  // Follow-up stats
-  const { data: followUps } = await supabase.from('follow_up_sequences').select('status')
-  const followups_pending = (followUps || []).filter(f => f.status === 'pending').length
-  const followups_sent = (followUps || []).filter(f => f.status === 'sent').length
+  // Follow-up stats (safe — won't crash if table doesn't exist)
+  let followups_pending = 0
+  let followups_sent = 0
+  try {
+    const { data: followUps } = await supabase.from('follow_up_sequences').select('status')
+    followups_pending = (followUps || []).filter(f => f.status === 'pending').length
+    followups_sent = (followUps || []).filter(f => f.status === 'sent').length
+  } catch {}
 
   // Leads by status
   const statusCounts: Record<string, number> = {}
