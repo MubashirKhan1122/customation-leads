@@ -47,7 +47,7 @@ async function findBusinessesOverpass(
   // Build compact query (no extra whitespace)
   const nodeQueries = categoryTags.map(tag => `node${tag}(around:${radiusMeters},${lat},${lng});`).join('')
   const wayQueries = categoryTags.map(tag => `way${tag}(around:${radiusMeters},${lat},${lng});`).join('')
-  const query = `[out:json][timeout:25];(${nodeQueries}${wayQueries});out body 50;`
+  const query = `[out:json][timeout:30];(${nodeQueries}${wayQueries});out body 500;`
 
   // Try multiple Overpass servers
   const servers = [
@@ -215,7 +215,7 @@ export async function findPlaces(query: string, userLat?: number, userLng?: numb
 
   console.log(`[Places] Query: "${query}" → category="${category}" location="${locationQuery}" coords=${lat},${lng}`)
 
-  const places = await findBusinessesOverpass(lat, lng, category, 10000)
+  const places = await findBusinessesOverpass(lat, lng, category, 20000)
 
   // Sort: businesses with websites first
   places.sort((a, b) => {
@@ -225,7 +225,7 @@ export async function findPlaces(query: string, userLat?: number, userLng?: numb
   })
 
   return {
-    places: places.slice(0, 30),
+    places: places.slice(0, 200),
     location: { lat, lng, display },
   }
 }
