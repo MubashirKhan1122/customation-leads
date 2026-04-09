@@ -86,13 +86,96 @@ interface BusinessResult {
   category: string
 }
 
+// Use Google Custom Search JSON API (100 free queries/day)
+async function searchGoogleCSE(query: string, apiKey: string, cseId: string): Promise<BusinessResult[]> {
+  const results: BusinessResult[] = []
+  const category = query.split(' ')[0] || 'business'
+
+  try {
+    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cseId}&q=${encodeURIComponent(query)}&num=10`
+    const res = await fetch(url)
+    const data = await res.json()
+
+    if (data.items && Array.isArray(data.items)) {
+      for (const item of data.items) {
+        const link = item.link || ''
+        if (!link.startsWith('http')) continue
+
+        let cleanUrl = link
+        try { cleanUrl = new URL(link).origin } catch {}
+
+        results.push({
+          name: (item.title || '').replace(/ - .*$/, '').replace(/ \| .*$/, '').trim(),
+          website: cleanUrl,
+          phone: '',
+          address: item.snippet || '',
+          category,
+        })
+      }
+    }
+  } catch (err) {
+    console.error('Google CSE error:', err)
+  }
+  return results
+}
+
+// Use SerpAPI for Google search (free tier: 100/month)
+async function searchSerpAPI(query: string, apiKey: string): Promise<BusinessResult[]> {
+  const results: BusinessResult[] = []
+  const category = query.split(' ')[0] || 'business'
+
+  try {
+    const url = `https://serpapi.com/search.json?q=${encodeURIComponent(query)}&api_key=${apiKey}&num=20`
+    const res = await fetch(url)
+    const data = await res.json()
+
+    // Local results (Google Maps businesses)
+    if (data.local_results?.places) {
+      for (const place of data.local_results.places) {
+        if (place.website) {
+          results.push({
+            name: place.title || place.name || '',
+            website: place.website,
+            phone: place.phone || '',
+            address: place.address || '',
+            category,
+          })
+        }
+      }
+    }
+
+    // Organic results
+    if (data.organic_results) {
+      for (const item of data.organic_results) {
+        const link = item.link || ''
+        if (!link.startsWith('http')) continue
+        if (isBlockedDomain(link)) continue
+
+        let cleanUrl = link
+        try { cleanUrl = new URL(link).origin } catch {}
+
+        results.push({
+          name: (item.title || '').replace(/ - .*$/, '').replace(/ \| .*$/, '').trim(),
+          website: cleanUrl,
+          phone: '',
+          address: item.snippet || '',
+          category,
+        })
+      }
+    }
+  } catch (err) {
+    console.error('SerpAPI error:', err)
+  }
+  return results
+}
+
 const BLOCKED_DOMAINS = [
   'google.com', 'bing.com', 'duckduckgo.com', 'yahoo.com',
   'facebook.com', 'instagram.com', 'twitter.com', 'x.com',
   'youtube.com', 'linkedin.com', 'pinterest.com', 'tiktok.com',
   'yelp.com', 'tripadvisor.com', 'wikipedia.org', 'amazon.com',
-  'reddit.com', 'quora.com', 'medium.com', 'nhs.uk',
-  'microsoft.com', 'apple.com', 'bbc.co.uk', 'bbc.com',
+  'reddit.com', 'quora.com', 'medium.com', 'microsoft.com',
+  'apple.com', 'bbc.co.uk', 'bbc.com',
 ]
 
 function isBlockedDomain(url: string): boolean {
@@ -100,72 +183,7 @@ function isBlockedDomain(url: string): boolean {
   return BLOCKED_DOMAINS.some(d => lower.includes(d))
 }
 
-function cleanResult(title: string, link: string, category: string): BusinessResult | null {
-  if (!title || !link || !link.startsWith('http') || isBlockedDomain(link)) return null
-
-  let cleanUrl = link
-  try {
-    cleanUrl = new URL(link).origin
-  } catch {
-    return null
-  }
-
-  return {
-    name: title.replace(/ - .*$/, '').replace(/ \| .*$/, '').replace(/\.com$/, '').trim(),
-    website: cleanUrl,
-    phone: '',
-    address: '',
-    category,
-  }
-}
-
-// Primary: SearXNG public instances (designed for programmatic access)
-async function searchSearXNG(query: string): Promise<BusinessResult[]> {
-  const results: BusinessResult[] = []
-  const instances = [
-    'https://search.sapti.me',
-    'https://searx.tiekoetter.com',
-    'https://search.bus-hit.me',
-    'https://paulgo.io',
-    'https://search.ononoki.org',
-  ]
-  const category = query.split(' ')[0] || 'business'
-
-  for (const instance of instances) {
-    try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 10000)
-      const res = await fetch(
-        `${instance}/search?q=${encodeURIComponent(query)}&format=json&categories=general`,
-        {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json',
-          },
-        }
-      )
-      clearTimeout(timeout)
-
-      if (!res.ok) continue
-      const data = await res.json()
-
-      if (data.results && Array.isArray(data.results)) {
-        for (const r of data.results) {
-          const cleaned = cleanResult(r.title || '', r.url || '', category)
-          if (cleaned) results.push(cleaned)
-        }
-      }
-
-      if (results.length >= 5) break
-    } catch {
-      continue
-    }
-  }
-  return results
-}
-
-// Fallback: DuckDuckGo HTML (POST-based)
+// Fallback: DuckDuckGo HTML
 async function searchDuckDuckGo(query: string): Promise<BusinessResult[]> {
   const results: BusinessResult[] = []
   const category = query.split(' ')[0] || 'business'
@@ -175,7 +193,6 @@ async function searchDuckDuckGo(query: string): Promise<BusinessResult[]> {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'text/html',
       },
       body: `q=${encodeURIComponent(query + ' official site')}`,
     })
@@ -194,8 +211,11 @@ async function searchDuckDuckGo(query: string): Promise<BusinessResult[]> {
         } catch {}
       }
 
-      const cleaned = cleanResult(title, link, category)
-      if (cleaned) results.push(cleaned)
+      if (title && link && link.startsWith('http') && !isBlockedDomain(link)) {
+        let cleanUrl = link
+        try { cleanUrl = new URL(link).origin } catch {}
+        results.push({ name: title.replace(/ - .*$/, '').replace(/ \| .*$/, '').trim(), website: cleanUrl, phone: '', address: '', category })
+      }
     })
   } catch (err) {
     console.error('DDG error:', err)
@@ -209,20 +229,19 @@ async function searchBing(query: string): Promise<BusinessResult[]> {
   const category = query.split(' ')[0] || 'business'
   try {
     const res = await fetch(`https://www.bing.com/search?q=${encodeURIComponent(query + ' website')}&count=20`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html',
-      },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
     })
     const html = await res.text()
     const $ = cheerio.load(html)
-
     $('li.b_algo').each((_, el) => {
       const titleEl = $(el).find('h2 a')
       const title = titleEl.text().trim()
       const link = titleEl.attr('href') || ''
-      const cleaned = cleanResult(title, link, category)
-      if (cleaned) results.push(cleaned)
+      if (title && link && link.startsWith('http') && !isBlockedDomain(link)) {
+        let cleanUrl = link
+        try { cleanUrl = new URL(link).origin } catch {}
+        results.push({ name: title.replace(/ - .*$/, '').replace(/ \| .*$/, '').trim(), website: cleanUrl, phone: '', address: '', category })
+      }
     })
   } catch (err) {
     console.error('Bing error:', err)
@@ -230,47 +249,31 @@ async function searchBing(query: string): Promise<BusinessResult[]> {
   return results
 }
 
-// Fallback: Google
-async function searchGoogle(query: string): Promise<BusinessResult[]> {
-  const results: BusinessResult[] = []
-  const category = query.split(' ')[0] || 'business'
-  try {
-    const res = await fetch(`https://www.google.com/search?q=${encodeURIComponent(query)}&num=20`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html',
-      },
-    })
-    const html = await res.text()
-    const $ = cheerio.load(html)
+export async function searchBusinesses(
+  query: string,
+  googleCseKey?: string,
+  googleCseId?: string,
+  serpApiKey?: string,
+): Promise<BusinessResult[]> {
+  const promises: Promise<BusinessResult[]>[] = []
 
-    $('div.g').each((_, el) => {
-      const title = $(el).find('h3').first().text().trim()
-      const link = $(el).find('a').first().attr('href') || ''
-      const cleaned = cleanResult(title, link, category)
-      if (cleaned) results.push(cleaned)
-    })
-  } catch (err) {
-    console.error('Google error:', err)
+  // Use real APIs if configured
+  if (serpApiKey) {
+    promises.push(searchSerpAPI(query, serpApiKey))
   }
-  return results
-}
+  if (googleCseKey && googleCseId) {
+    promises.push(searchGoogleCSE(query, googleCseKey, googleCseId))
+  }
 
-export async function searchBusinesses(query: string): Promise<BusinessResult[]> {
-  // Try all sources, combine results
-  const [searxResults, ddgResults, bingResults, googleResults] = await Promise.allSettled([
-    searchSearXNG(query),
-    searchDuckDuckGo(query),
-    searchBing(query),
-    searchGoogle(query),
-  ])
+  // Always try free scraping as fallback
+  promises.push(searchDuckDuckGo(query))
+  promises.push(searchBing(query))
 
-  const all: BusinessResult[] = [
-    ...(searxResults.status === 'fulfilled' ? searxResults.value : []),
-    ...(ddgResults.status === 'fulfilled' ? ddgResults.value : []),
-    ...(bingResults.status === 'fulfilled' ? bingResults.value : []),
-    ...(googleResults.status === 'fulfilled' ? googleResults.value : []),
-  ]
+  const settled = await Promise.allSettled(promises)
+  const all: BusinessResult[] = []
+  for (const r of settled) {
+    if (r.status === 'fulfilled') all.push(...r.value)
+  }
 
   // Deduplicate by domain
   const seen = new Set<string>()

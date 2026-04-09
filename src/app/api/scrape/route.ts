@@ -11,7 +11,19 @@ export async function POST(req: NextRequest) {
 
   if (body.action === 'search') {
     try {
-      const results = await searchBusinesses(body.query)
+      // Get API keys from settings
+      const { data: settings } = await supabase.from('settings').select('serpapi_key, google_cse_key, google_cse_id').limit(1).single()
+
+      const serpApiKey = settings?.serpapi_key || process.env.SERPAPI_KEY
+      const googleCseKey = settings?.google_cse_key || process.env.GOOGLE_CSE_KEY
+      const googleCseId = settings?.google_cse_id || process.env.GOOGLE_CSE_ID
+
+      const results = await searchBusinesses(
+        body.query,
+        googleCseKey,
+        googleCseId,
+        serpApiKey,
+      )
       return NextResponse.json({ results, count: results.length })
     } catch (error: any) {
       console.error('Search error:', error)
@@ -58,9 +70,7 @@ export async function POST(req: NextRequest) {
         .select()
         .single()
 
-      if (error) {
-        console.error('DB insert error:', error)
-      }
+      if (error) console.error('DB insert error:', error)
 
       // Save audit if available
       if (lead && auditResult) {

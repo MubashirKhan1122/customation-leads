@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import DashboardLayout from '@/components/DashboardLayout'
-import { Save, Mail, Building, User, Clock, CheckCircle } from 'lucide-react'
+import { Save, Mail, Building, User, Clock, CheckCircle, Key } from 'lucide-react'
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -11,6 +11,9 @@ export default function SettingsPage() {
     sender_name: 'Mubashir Khan',
     company_name: 'Customation',
     email_delay_seconds: 5,
+    serpapi_key: '',
+    google_cse_key: '',
+    google_cse_id: '',
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -117,6 +120,46 @@ export default function SettingsPage() {
                 onChange={e => setSettings(s => ({ ...s, company_name: e.target.value }))}
                 className="input-field w-full"
                 placeholder="Your Company"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Search API Keys */}
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Key className="w-5 h-5 text-green-400" /> Search API Keys
+          </h2>
+          <p className="text-xs text-gray-500 mb-4">Configure at least one API for the auto-search feature to work. SerpAPI is recommended.</p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">SerpAPI Key <span className="text-gray-600">(recommended - 100 free/month)</span></label>
+              <input
+                type="password"
+                value={settings.serpapi_key}
+                onChange={e => setSettings(s => ({ ...s, serpapi_key: e.target.value }))}
+                className="input-field w-full"
+                placeholder="Get from serpapi.com"
+              />
+            </div>
+            <div className="border-t border-[var(--border)] pt-4">
+              <label className="block text-sm text-gray-400 mb-2">Google Custom Search API Key <span className="text-gray-600">(100 free/day)</span></label>
+              <input
+                type="password"
+                value={settings.google_cse_key}
+                onChange={e => setSettings(s => ({ ...s, google_cse_key: e.target.value }))}
+                className="input-field w-full"
+                placeholder="Get from console.cloud.google.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Google Custom Search Engine ID</label>
+              <input
+                type="text"
+                value={settings.google_cse_id}
+                onChange={e => setSettings(s => ({ ...s, google_cse_id: e.target.value }))}
+                className="input-field w-full"
+                placeholder="Get from programmablesearchengine.google.com"
               />
             </div>
           </div>

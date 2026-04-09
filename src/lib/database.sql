@@ -52,6 +52,9 @@ CREATE TABLE IF NOT EXISTS settings (
   sender_name TEXT DEFAULT 'Mubashir Khan',
   company_name TEXT DEFAULT 'Customation',
   email_delay_seconds INTEGER DEFAULT 5,
+  serpapi_key TEXT DEFAULT '',
+  google_cse_key TEXT DEFAULT '',
+  google_cse_id TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
