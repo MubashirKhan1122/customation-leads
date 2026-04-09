@@ -3,6 +3,7 @@ import { scrapeEmails } from '@/lib/scraper'
 import { auditWebsite } from '@/lib/auditor'
 import { detectServiceNeeds, getPitchSummary } from '@/lib/prospector'
 import { getServiceSupabase } from '@/lib/supabase'
+import { isDuplicate } from '@/lib/dedup'
 
 export const maxDuration = 60
 
@@ -41,6 +42,20 @@ export async function POST(req: NextRequest) {
     }]
     pitchSummary = '🔥 HOT LEAD: No website — needs full web presence'
     score = 0
+  }
+
+  // Check for duplicates
+  const duplicate = await isDuplicate(place.website)
+  if (duplicate) {
+    return NextResponse.json({
+      emails,
+      score,
+      saved: false,
+      duplicate: true,
+      needs,
+      pitchSummary,
+      lead_id: null,
+    })
   }
 
   // Save to database

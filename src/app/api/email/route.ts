@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateEmailTemplate, sendEmail } from '@/lib/emailer'
 import { getServiceSupabase } from '@/lib/supabase'
+import { scheduleFollowUps } from '@/lib/followups'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -55,6 +56,19 @@ export async function POST(req: NextRequest) {
         status: 'sent',
         sent_at: new Date().toISOString(),
       })
+
+      // Schedule follow-up sequence
+      const { data: emailLog } = await supabase
+        .from('email_logs')
+        .select('id')
+        .eq('lead_id', body.lead_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (emailLog) {
+        await scheduleFollowUps(body.lead_id, emailLog.id)
+      }
 
       // Update lead status
       await supabase.from('leads').update({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { scrapeEmails, searchBusinesses } from '@/lib/scraper'
 import { auditWebsite } from '@/lib/auditor'
 import { getServiceSupabase } from '@/lib/supabase'
+import { isDuplicate } from '@/lib/dedup'
 
 export const maxDuration = 60
 
@@ -51,6 +52,18 @@ export async function POST(req: NextRequest) {
         score = auditResult.score
       } catch (err) {
         console.error('Audit error:', err)
+      }
+
+      // Check for duplicates
+      const duplicate = await isDuplicate(business.website)
+      if (duplicate) {
+        return NextResponse.json({
+          emails,
+          score,
+          saved: false,
+          duplicate: true,
+          lead_id: null,
+        })
       }
 
       // Save lead to database

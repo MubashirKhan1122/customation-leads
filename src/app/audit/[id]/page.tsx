@@ -14,17 +14,63 @@ export default function AuditPage() {
   const [audit, setAudit] = useState<Audit | null>(null)
   const [loading, setLoading] = useState(true)
   const [auditing, setAuditing] = useState(false)
+  const [notes, setNotes] = useState<Array<{id: string; content: string; created_at: string}>>([])
+  const [newNote, setNewNote] = useState('')
+  const [tags, setTags] = useState<string[]>([])
+  const [newTag, setNewTag] = useState('')
 
   useEffect(() => {
     fetch(`/api/audit?lead_id=${params.id}`)
       .then(r => r.json())
       .then(data => {
         setLead(data.lead)
+        setTags(data.lead?.tags || [])
         setAudit(data.audit)
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [params.id])
+
+  useEffect(() => {
+    if (!params.id) return
+    fetch(`/api/notes?lead_id=${params.id}`).then(r => r.json()).then(d => setNotes(d.notes || []))
+  }, [params.id])
+
+  const addNote = async () => {
+    if (!newNote.trim() || !lead) return
+    const res = await fetch('/api/notes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: lead.id, content: newNote }),
+    })
+    const data = await res.json()
+    if (data.note) { setNotes(prev => [data.note, ...prev]); setNewNote('') }
+  }
+
+  const deleteNote = async (id: string) => {
+    await fetch(`/api/notes?id=${id}`, { method: 'DELETE' })
+    setNotes(prev => prev.filter(n => n.id !== id))
+  }
+
+  const addTag = async () => {
+    if (!newTag.trim() || !lead) return
+    const updated = [...tags, newTag.trim().toLowerCase()]
+    await fetch('/api/tags', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: lead.id, tags: updated }),
+    })
+    setTags(updated)
+    setNewTag('')
+  }
+
+  const removeTag = async (tag: string) => {
+    if (!lead) return
+    const updated = tags.filter(t => t !== tag)
+    await fetch('/api/tags', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lead_id: lead.id, tags: updated }),
+    })
+    setTags(updated)
+  }
 
   const runAudit = async () => {
     if (!lead) return
@@ -171,6 +217,54 @@ export default function AuditPage() {
           <button onClick={runAudit} disabled={auditing} className="btn-primary disabled:opacity-50">
             {auditing ? 'Auditing...' : 'Run Audit Now'}
           </button>
+        </div>
+      )}
+
+      {/* Notes & Tags */}
+      {lead && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          {/* Tags */}
+          <div className="card p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Tags</h2>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {tags.map(tag => (
+                <span key={tag} className="text-xs px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-1">
+                  {tag}
+                  <button onClick={() => removeTag(tag)} className="hover:text-red-400 ml-1">&times;</button>
+                </span>
+              ))}
+              {tags.length === 0 && <span className="text-xs text-gray-600">No tags yet</span>}
+            </div>
+            <div className="flex gap-2">
+              <input type="text" value={newTag} onChange={e => setNewTag(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addTag()}
+                placeholder="Add tag (e.g. high-budget, follow-up)" className="input-field flex-1 text-sm py-1.5" />
+              <button onClick={addTag} className="btn-secondary text-sm px-3 py-1.5">Add</button>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="card p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Notes</h2>
+            <div className="flex gap-2 mb-4">
+              <input type="text" value={newNote} onChange={e => setNewNote(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addNote()}
+                placeholder="Add a note..." className="input-field flex-1 text-sm py-1.5" />
+              <button onClick={addNote} className="btn-primary text-sm px-3 py-1.5">Add</button>
+            </div>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {notes.map(note => (
+                <div key={note.id} className="p-3 rounded-lg bg-white/[0.02] border border-[var(--border)] flex justify-between items-start">
+                  <div>
+                    <p className="text-sm text-gray-300">{note.content}</p>
+                    <p className="text-[10px] text-gray-600 mt-1">{new Date(note.created_at).toLocaleString()}</p>
+                  </div>
+                  <button onClick={() => deleteNote(note.id)} className="text-gray-600 hover:text-red-400 text-xs ml-2">&#x2715;</button>
+                </div>
+              ))}
+              {notes.length === 0 && <p className="text-xs text-gray-600">No notes yet</p>}
+            </div>
+          </div>
         </div>
       )}
     </DashboardLayout>

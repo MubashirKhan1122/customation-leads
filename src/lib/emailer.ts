@@ -12,7 +12,8 @@ export function generateEmailTemplate(
   issues: string[],
   score: number,
   senderName: string = 'Mubashir Khan',
-  companyName: string = 'Customation'
+  companyName: string = 'Customation',
+  toEmail: string = ''
 ): { subject: string; html: string } {
   const topIssues = issues.slice(0, 3)
   const scoreLabel = score < 40 ? 'critical' : score < 60 ? 'needs improvement' : 'decent but could be better'
@@ -46,6 +47,11 @@ export function generateEmailTemplate(
       <strong>${senderName}</strong><br/>
       ${companyName}<br/>
       <span style="color:#6b7280;font-size:13px;">Design & Tech Agency</span></p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 16px;" />
+      <p style="color:#9ca3af;font-size:11px;text-align:center;">
+        You're receiving this because we found your business online.<br/>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://customation-leads.vercel.app'}/unsubscribe?email=${encodeURIComponent(toEmail)}" style="color:#9ca3af;text-decoration:underline;">Unsubscribe</a>
+      </p>
     </div>
   `
 
