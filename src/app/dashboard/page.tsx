@@ -1,9 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import DashboardLayout from '@/components/DashboardLayout'
 import StatCard from '@/components/StatCard'
 import { Users, Mail, Target, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react'
+
+const BarChart = dynamic(() => import('recharts').then(m => m.BarChart) as any, { ssr: false }) as any
+const Bar = dynamic(() => import('recharts').then(m => m.Bar) as any, { ssr: false }) as any
+const XAxis = dynamic(() => import('recharts').then(m => m.XAxis) as any, { ssr: false }) as any
+const YAxis = dynamic(() => import('recharts').then(m => m.YAxis) as any, { ssr: false }) as any
+const Tooltip = dynamic(() => import('recharts').then(m => m.Tooltip) as any, { ssr: false }) as any
+const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer) as any, { ssr: false }) as any
 
 interface Stats {
   total_leads: number
@@ -25,6 +33,7 @@ interface Stats {
     status: string
     created_at: string
   }>
+  leads_by_status: Array<{ status: string; count: number }>
 }
 
 export default function DashboardPage() {
@@ -91,6 +100,23 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Charts */}
+      {stats?.leads_by_status && stats.leads_by_status.length > 0 && (
+        <div className="card p-6 mb-8">
+          <h2 className="text-lg font-semibold text-white mb-4">Leads by Status</h2>
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stats.leads_by_status}>
+                <XAxis dataKey="status" tick={{ fill: '#6b7280', fontSize: 12 }} />
+                <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+                <Tooltip contentStyle={{ backgroundColor: '#111118', border: '1px solid #1e1e2e', borderRadius: '8px', color: '#fff' }} />
+                <Bar dataKey="count" fill="#6d28d9" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Recent Leads Table */}
       <div className="card">

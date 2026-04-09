@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Search, Users, Mail, Settings, LogOut, Zap, Target, Menu, X, FolderOpen } from 'lucide-react'
+import { LayoutDashboard, Search, Users, Mail, Settings, LogOut, Zap, Target, Menu, X, FolderOpen, Clock, FileText } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 const navItems = [
@@ -12,6 +12,8 @@ const navItems = [
   { href: '/leads', label: 'All Leads', icon: Users },
   { href: '/email', label: 'Email Center', icon: Mail },
   { href: '/campaigns', label: 'Campaigns', icon: FolderOpen },
+  { href: '/followups', label: 'Follow-ups', icon: Clock },
+  { href: '/templates', label: 'Templates', icon: FileText },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -59,13 +61,17 @@ export default function Sidebar({ isOpen, onToggle }: { isOpen?: boolean; onTogg
       </nav>
 
       <div className="p-4 border-t border-[var(--border)]">
-        <Link
-          href="/login"
-          className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
+        <button
+          onClick={() => {
+            document.cookie = 'auth_token=; path=/; max-age=0'
+            localStorage.removeItem('authenticated')
+            window.location.href = '/login'
+          }}
+          className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all w-full"
         >
           <LogOut className="w-5 h-5" />
           Logout
-        </Link>
+        </button>
       </div>
     </>
   )

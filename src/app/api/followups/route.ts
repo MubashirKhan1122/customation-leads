@@ -146,3 +146,10 @@ export async function POST(req: NextRequest) {
     results,
   })
 }
+
+export async function PATCH(req: NextRequest) {
+  const { id, status } = await req.json()
+  const supabase = getServiceSupabase()
+  const { error } = await supabase.from('follow_up_sequences').update({ status }).eq('id', id)
+  return NextResponse.json({ success: !error })
+}

@@ -25,6 +25,7 @@ export default function LoginPage() {
       const data = await res.json()
       if (data.success) {
         localStorage.setItem('authenticated', 'true')
+        document.cookie = 'auth_token=authenticated; path=/; max-age=604800'
         localStorage.setItem('user_email', email)
         router.push('/dashboard')
       } else {

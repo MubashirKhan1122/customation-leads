@@ -33,6 +33,13 @@ export async function GET() {
   const followups_pending = (followUps || []).filter(f => f.status === 'pending').length
   const followups_sent = (followUps || []).filter(f => f.status === 'sent').length
 
+  // Leads by status
+  const statusCounts: Record<string, number> = {}
+  for (const lead of leads) {
+    statusCounts[lead.status] = (statusCounts[lead.status] || 0) + 1
+  }
+  const leads_by_status = Object.entries(statusCounts).map(([status, count]) => ({ status, count }))
+
   return NextResponse.json({
     total_leads,
     leads_with_email,
@@ -45,5 +52,6 @@ export async function GET() {
     followups_pending,
     followups_sent,
     recent_leads: leads.slice(0, 10),
+    leads_by_status,
   })
 }

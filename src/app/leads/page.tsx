@@ -84,6 +84,33 @@ export default function LeadsPage() {
                 {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               {assignCampaign && <button onClick={assignToCampaign} className="btn-primary text-sm py-1.5">Assign</button>}
+              <select onChange={async (e) => {
+                if (!e.target.value || selectedLeads.size === 0) return
+                const status = e.target.value
+                for (const id of Array.from(selectedLeads)) {
+                  await fetch('/api/leads', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) })
+                }
+                e.target.value = ''
+                setSelectedLeads(new Set())
+                fetchLeads()
+              }} className="input-field py-1.5 text-sm">
+                <option value="">Bulk status...</option>
+                <option value="new">Set New</option>
+                <option value="contacted">Set Contacted</option>
+                <option value="replied">Set Replied</option>
+                <option value="converted">Set Converted</option>
+                <option value="ignored">Set Ignored</option>
+              </select>
+              <button onClick={async () => {
+                if (!confirm(`Delete ${selectedLeads.size} leads?`)) return
+                for (const id of Array.from(selectedLeads)) {
+                  await fetch(`/api/leads?id=${id}`, { method: 'DELETE' })
+                }
+                setSelectedLeads(new Set())
+                fetchLeads()
+              }} className="text-sm px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20">
+                Delete ({selectedLeads.size})
+              </button>
             </>
           )}
           <a href="/api/export?type=leads" className="btn-secondary flex items-center gap-2 text-sm">
@@ -138,15 +165,16 @@ export default function LeadsPage() {
                 <th className="text-left text-xs text-gray-500 uppercase px-6 py-3">Email</th>
                 <th className="text-left text-xs text-gray-500 uppercase px-6 py-3">Score</th>
                 <th className="text-left text-xs text-gray-500 uppercase px-6 py-3">Status</th>
+                <th className="text-left text-xs text-gray-500 uppercase px-6 py-3">Tags</th>
                 <th className="text-left text-xs text-gray-500 uppercase px-6 py-3">Added</th>
                 <th className="text-right text-xs text-gray-500 uppercase px-6 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">Loading...</td></tr>
+                <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-500">Loading...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">No leads found</td></tr>
+                <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-500">No leads found</td></tr>
               ) : filtered.map(lead => (
                 <tr key={lead.id} className="border-b border-[var(--border)] hover:bg-white/[0.02] group">
                   <td className="px-6 py-4"><input type="checkbox" checked={selectedLeads.has(lead.id)} onChange={() => toggleSelectLead(lead.id)} className="rounded" /></td>
@@ -185,6 +213,13 @@ export default function LeadsPage() {
                       <option value="converted">Converted</option>
                       <option value="ignored">Ignored</option>
                     </select>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-1">
+                      {(lead.tags || []).map((tag: string) => (
+                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">{tag}</span>
+                      ))}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-xs text-gray-500">
                     {new Date(lead.created_at).toLocaleDateString()}

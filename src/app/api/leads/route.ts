@@ -19,6 +19,9 @@ export async function GET(req: NextRequest) {
   if (emailFilter === 'has_email') query = query.not('email', 'is', null)
   else if (emailFilter === 'no_email') query = query.is('email', null)
 
+  const campaignId = params.get('campaign_id')
+  if (campaignId) query = query.eq('campaign_id', campaignId)
+
   const search = params.get('search')
   if (search) query = query.or(`name.ilike.%${search}%,website.ilike.%${search}%`)
 
