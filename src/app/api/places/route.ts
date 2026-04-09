@@ -9,41 +9,6 @@ export const maxDuration = 60
 export async function POST(req: NextRequest) {
   const body = await req.json()
 
-  // Action: debug — test Overpass directly
-  if (body.action === 'debug') {
-    const logs: string[] = []
-    try {
-      // Test Nominatim
-      logs.push('Testing Nominatim...')
-      const geoRes = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent('london')}&format=json&limit=1`,
-        { headers: { 'User-Agent': 'CustomationLeadMachine/1.0' } }
-      )
-      const geoData = await geoRes.json()
-      logs.push(`Nominatim: ${geoRes.status}, ${JSON.stringify(geoData[0]?.lat)}`)
-
-      // Test Overpass
-      logs.push('Testing Overpass...')
-      const query = `[out:json][timeout:25];(node["amenity"="restaurant"](around:5000,51.5074,-0.1278););out body 5;`
-      const ovRes = await fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `data=${encodeURIComponent(query)}`,
-      })
-      const ovText = await ovRes.text()
-      logs.push(`Overpass: status=${ovRes.status}, length=${ovText.length}, first100=${ovText.substring(0, 100)}`)
-      try {
-        const ovData = JSON.parse(ovText)
-        logs.push(`Overpass elements: ${ovData?.elements?.length}`)
-      } catch {
-        logs.push('Overpass: failed to parse JSON')
-      }
-    } catch (err: any) {
-      logs.push(`Error: ${err.message}`)
-    }
-    return NextResponse.json({ logs })
-  }
-
   // Action: find — just find places (fast)
   if (body.action === 'find') {
     try {
