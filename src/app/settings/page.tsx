@@ -18,6 +18,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     fetch('/api/settings')
@@ -32,6 +33,7 @@ export default function SettingsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+    setError('')
     try {
       await fetch('/api/settings', {
         method: 'POST',
@@ -42,6 +44,7 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
       console.error(err)
+      setError('Failed to save settings. Please try again.')
     }
     setSaving(false)
   }
@@ -193,6 +196,7 @@ export default function SettingsPage() {
             <><Save className="w-4 h-4" /> Save Settings</>
           )}
         </button>
+        {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
       </form>
     </DashboardLayout>
   )

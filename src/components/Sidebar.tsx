@@ -17,7 +17,7 @@ const navItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
-export default function Sidebar({ isOpen, onToggle }: { isOpen?: boolean; onToggle?: () => void }) {
+export default function Sidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
 

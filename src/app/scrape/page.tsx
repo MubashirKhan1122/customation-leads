@@ -16,6 +16,7 @@ interface Place {
   emails?: string[]
   score?: number | null
   saved?: boolean
+  duplicate?: boolean
   processing?: boolean
   processed?: boolean
 }
@@ -93,6 +94,7 @@ export default function ScrapePage() {
     setProcessing(true)
     const withWebsite = places.filter(p => p.website)
     let emailCount = 0
+    let dupeCount = 0
 
     for (let i = 0; i < places.length; i++) {
       const place = places[i]
@@ -124,6 +126,7 @@ export default function ScrapePage() {
           })
           const data = await res.json()
           if (data.emails?.length > 0) emailCount++
+          if (data.duplicate) dupeCount++
 
           setPlaces(prev => prev.map((p, idx) =>
             idx === i ? {
@@ -131,6 +134,7 @@ export default function ScrapePage() {
               processing: false,
               processed: true,
               saved: data.saved || false,
+              duplicate: data.duplicate || false,
               emails: data.emails || [],
               score: data.score ?? null,
             } : p
@@ -143,7 +147,8 @@ export default function ScrapePage() {
       setStats(prev => ({ ...prev, processed: i + 1, withEmail: emailCount }))
     }
 
-    setProgress(`Done! ${places.length} leads saved, ${emailCount} emails found. Check "All Leads" page.`)
+    const dupeText = dupeCount > 0 ? ` (${dupeCount} duplicates skipped)` : ''
+    setProgress(`Done! ${places.length} leads saved, ${emailCount} emails found.${dupeText} Check "All Leads" page.`)
     setProcessing(false)
   }
 
@@ -212,9 +217,9 @@ export default function ScrapePage() {
       </div>
 
       {/* Main Layout */}
-      <div className="flex gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         {/* Left: Results */}
-        <div className={showMap ? 'w-[58%] min-w-0' : 'w-full'}>
+        <div className={showMap ? 'w-full lg:w-[58%] min-w-0' : 'w-full'}>
 
           {/* Stats + Scrape All Button */}
           {places.length > 0 && (
@@ -303,6 +308,9 @@ export default function ScrapePage() {
                         {place.saved && (
                           <CheckCircle className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
                         )}
+                        {place.duplicate && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">Duplicate</span>
+                        )}
                       </div>
 
                       {place.address && (
@@ -371,7 +379,7 @@ export default function ScrapePage() {
 
         {/* Right: Google Maps */}
         {showMap && (
-          <div className="w-[42%] flex-shrink-0">
+          <div className="w-full lg:w-[42%] flex-shrink-0 max-h-[50vh] lg:max-h-none">
             <div className="sticky top-8">
               <div className="card overflow-hidden" style={{ height: 'calc(100vh - 200px)' }}>
                 <div className="p-3 border-b border-[var(--border)]">

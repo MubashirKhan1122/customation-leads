@@ -106,9 +106,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-xs text-gray-600 text-center mt-6">
-            Default: admin@customation.com / admin123
-          </p>
         </div>
       </div>
     </div>

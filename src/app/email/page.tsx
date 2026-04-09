@@ -70,7 +70,7 @@ export default function EmailPage() {
       const res = await fetch('/api/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'preview', lead_id: lead.id, lead_name: lead.name, issues: lead.issues, score: lead.score }),
+        body: JSON.stringify({ action: 'preview', lead_id: lead.id, to: lead.email, lead_name: lead.name, issues: lead.issues, score: lead.score }),
       })
       const data = await res.json()
       setPreview({ subject: data.subject, html: data.html })

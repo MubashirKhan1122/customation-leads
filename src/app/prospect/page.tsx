@@ -43,6 +43,7 @@ export default function ProspectPage() {
   const [progress, setProgress] = useState('')
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
   const [filterPriority, setFilterPriority] = useState<string>('all')
+  const [cityError, setCityError] = useState('')
 
   const stats = {
     total: results.length,
@@ -55,17 +56,23 @@ export default function ProspectPage() {
   const searchCity = async () => {
     if (!cityInput.trim()) return
     setCitySearching(true)
+    setCityError('')
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityInput)}&format=json&limit=5&addressdetails=1`, {
         headers: { 'User-Agent': 'CustomationLeadMachine/1.0' }
       })
       const data = await res.json()
+      if (data.length === 0) {
+        setCityError('No results found for that city name.')
+      }
       setCitySuggestions(data.map((d: any) => ({
         name: d.display_name.split(',').slice(0, 2).join(',').trim(),
         lat: parseFloat(d.lat),
         lng: parseFloat(d.lon),
       })))
-    } catch {}
+    } catch {
+      setCityError('Could not find city. Try a different name.')
+    }
     setCitySearching(false)
   }
 
@@ -230,6 +237,7 @@ export default function ProspectPage() {
                 ))}
               </div>
             )}
+            {cityError && <p className="text-xs text-red-400 mb-2">{cityError}</p>}
             {/* Quick add popular cities */}
             <div className="flex flex-wrap gap-1.5 mb-3">
               {[

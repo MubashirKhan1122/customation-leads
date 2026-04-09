@@ -14,6 +14,7 @@ export default function AuditPage() {
   const [audit, setAudit] = useState<Audit | null>(null)
   const [loading, setLoading] = useState(true)
   const [auditing, setAuditing] = useState(false)
+  const [auditSuccess, setAuditSuccess] = useState(false)
   const [notes, setNotes] = useState<Array<{id: string; content: string; created_at: string}>>([])
   const [newNote, setNewNote] = useState('')
   const [tags, setTags] = useState<string[]>([])
@@ -103,6 +104,8 @@ export default function AuditPage() {
       })
       const data = await res.json()
       setAudit(data.audit)
+      setAuditSuccess(true)
+      setTimeout(() => setAuditSuccess(false), 3000)
     } catch (err) {
       console.error(err)
     }
@@ -159,7 +162,7 @@ export default function AuditPage() {
           <div className="flex items-center gap-4">
             {audit && <ScoreRing score={audit.score} size={100} />}
             <button onClick={runAudit} disabled={auditing} className="btn-primary text-sm disabled:opacity-50">
-              {auditing ? 'Auditing...' : audit ? 'Re-Audit' : 'Run Audit'}
+              {auditing ? 'Auditing...' : auditSuccess ? '✓ Done!' : audit ? 'Re-Audit' : 'Run Audit'}
             </button>
           </div>
         </div>
