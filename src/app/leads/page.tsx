@@ -13,6 +13,26 @@ export default function LeadsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [emailFilter, setEmailFilter] = useState<string>('all')
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
+  const [campaigns, setCampaigns] = useState<Array<{id: string; name: string}>>([])
+  const [assignCampaign, setAssignCampaign] = useState('')
+
+  useEffect(() => {
+    fetch('/api/campaigns').then(r => r.json()).then(d => setCampaigns(d.campaigns || [])).catch(() => {})
+  }, [])
+
+  const toggleSelectLead = (id: string) => {
+    setSelectedLeads(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+  const selectAllFiltered = () => {
+    setSelectedLeads(prev => prev.size === filtered.length ? new Set() : new Set(filtered.map(l => l.id)))
+  }
+  const assignToCampaign = async () => {
+    if (!assignCampaign || selectedLeads.size === 0) return
+    await fetch('/api/campaigns', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'assign', campaign_id: assignCampaign, lead_ids: Array.from(selectedLeads) }) })
+    setSelectedLeads(new Set()); setAssignCampaign('')
+  }
 
   const fetchLeads = async () => {
     const params = new URLSearchParams()
@@ -55,12 +75,19 @@ export default function LeadsPage() {
           <h1 className="text-3xl font-bold text-white">All Leads</h1>
           <p className="text-gray-500 mt-1">{filtered.length} leads found</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          {selectedLeads.size > 0 && (
+            <>
+              <span className="text-sm text-purple-400">{selectedLeads.size} selected</span>
+              <select value={assignCampaign} onChange={e => setAssignCampaign(e.target.value)} className="input-field py-1.5 text-sm">
+                <option value="">Assign to campaign...</option>
+                {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              {assignCampaign && <button onClick={assignToCampaign} className="btn-primary text-sm py-1.5">Assign</button>}
+            </>
+          )}
           <a href="/api/export?type=leads" className="btn-secondary flex items-center gap-2 text-sm">
-            <Download className="w-4 h-4" /> Export CSV
-          </a>
-          <a href="/api/export?type=audits" className="btn-secondary flex items-center gap-2 text-sm">
-            <Download className="w-4 h-4" /> Audits CSV
+            <Download className="w-4 h-4" /> Export
           </a>
         </div>
       </div>
@@ -106,6 +133,7 @@ export default function LeadsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[var(--border)]">
+                <th className="px-6 py-3 w-10"><input type="checkbox" checked={selectedLeads.size === filtered.length && filtered.length > 0} onChange={selectAllFiltered} className="rounded" /></th>
                 <th className="text-left text-xs text-gray-500 uppercase px-6 py-3">Business</th>
                 <th className="text-left text-xs text-gray-500 uppercase px-6 py-3">Email</th>
                 <th className="text-left text-xs text-gray-500 uppercase px-6 py-3">Score</th>
@@ -116,11 +144,12 @@ export default function LeadsPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-500">Loading...</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">Loading...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-500">No leads found</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-500">No leads found</td></tr>
               ) : filtered.map(lead => (
                 <tr key={lead.id} className="border-b border-[var(--border)] hover:bg-white/[0.02] group">
+                  <td className="px-6 py-4"><input type="checkbox" checked={selectedLeads.has(lead.id)} onChange={() => toggleSelectLead(lead.id)} className="rounded" /></td>
                   <td className="px-6 py-4">
                     <div className="text-sm font-medium text-white">{lead.name}</div>
                     <a href={lead.website} target="_blank" rel="noopener" className="text-xs text-gray-500 hover:text-purple-400">

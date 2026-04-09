@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       body.score || 0,
       senderName,
       companyName,
+      body.to || '',
     )
     return NextResponse.json({ subject, html })
   }
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
       body.score || 0,
       senderName,
       companyName,
+      body.to || '',
     )
 
     // Insert email log first with 'pending' status to get the ID

@@ -23,6 +23,8 @@ export type Lead = {
   source_query: string | null
   score: number | null
   status: 'new' | 'contacted' | 'replied' | 'converted' | 'ignored'
+  tags: string[]
+  campaign_id: string | null
   email_sent_at: string | null
   created_at: string
 }
@@ -52,7 +54,8 @@ export type EmailLog = {
   lead_id: string
   subject: string
   body: string
-  status: 'sent' | 'failed' | 'replied'
+  status: 'sent' | 'failed' | 'replied' | 'pending' | 'opened' | 'clicked'
+  sequence_step: number
   sent_at: string
   created_at: string
 }
