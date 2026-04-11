@@ -49,20 +49,18 @@ async function findBusinessesOverpass(
   const wayQueries = categoryTags.map(tag => `way${tag}(around:${radiusMeters},${lat},${lng});`).join('')
   const query = `[out:json][timeout:30];(${nodeQueries}${wayQueries});out body 500;`
 
-  // Try multiple Overpass servers
+  // Try multiple Overpass servers (kumi first — more reliable from Vercel)
   const servers = [
-    'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass-api.de/api/interpreter',
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   ]
-
-  console.log(`[Overpass] Query: ${query.substring(0, 100)}...`)
 
   let data: any = null
   for (const server of servers) {
     try {
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 15000)
+      const timeout = setTimeout(() => controller.abort(), 12000)
       const res = await fetch(server, {
         method: 'POST',
         signal: controller.signal,
@@ -70,14 +68,11 @@ async function findBusinessesOverpass(
         body: `data=${encodeURIComponent(query)}`,
       })
       clearTimeout(timeout)
-      console.log(`[Overpass] ${server} → status ${res.status}`)
       if (res.ok) {
         data = await res.json()
-        console.log(`[Overpass] Got ${data?.elements?.length || 0} elements from ${server}`)
         if (data?.elements?.length > 0) break
       }
-    } catch (err) {
-      console.error(`[Overpass] ${server} failed:`, err)
+    } catch {
       continue
     }
   }
@@ -213,8 +208,6 @@ export async function findPlaces(query: string, userLat?: number, userLng?: numb
       return { places: [], location: null }
     }
   }
-
-  console.log(`[Places] Query: "${query}" → category="${category}" location="${locationQuery}" coords=${lat},${lng}`)
 
   const places = await findBusinessesOverpass(lat, lng, category, 20000)
 
