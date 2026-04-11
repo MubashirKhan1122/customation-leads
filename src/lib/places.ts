@@ -184,25 +184,26 @@ export async function findPlaces(query: string, userLat?: number, userLng?: numb
   let lng: number
   let display = ''
 
-  if (locationQuery) {
+  // If caller already provided coordinates, use them directly (most accurate)
+  if (userLat && userLng) {
+    lat = userLat
+    lng = userLng
+    display = locationQuery || query
+    // Try to get display name from geocoding, but don't block
+    if (locationQuery) {
+      const geo = await geocode(locationQuery)
+      if (geo) display = geo.display
+    }
+  } else if (locationQuery) {
     const geo = await geocode(locationQuery)
     if (geo) {
       lat = geo.lat
       lng = geo.lng
       display = geo.display
-    } else if (userLat && userLng) {
-      lat = userLat
-      lng = userLng
-      display = 'Near you'
     } else {
       return { places: [], location: null }
     }
-  } else if (userLat && userLng) {
-    lat = userLat
-    lng = userLng
-    display = 'Near you'
   } else {
-    // Default to a known city if no location
     const geo = await geocode(query)
     if (geo) {
       lat = geo.lat
